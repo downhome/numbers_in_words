@@ -11,8 +11,10 @@ module NumbersInWords
   class ToWord
     attr_reader :that
 
-    def initialize(that)
+    def initialize(that, connector: nil, format: nil)
       @that = that
+      @connector = connector || ' point '
+      @format = format
     end
 
     def to_i
@@ -28,6 +30,7 @@ module NumbersInWords
     def in_words(fraction: false)
       as_fraction(fraction) ||
         handle_exceptional_numbers ||
+        currency ||
         decimals ||
         negative ||
         output
@@ -37,11 +40,18 @@ module NumbersInWords
       return Fraction.in_words(that) if fraction
     end
 
+    def currency
+      return unless @format&.to_sym == :currency
+
+      dollars, cents = @that.to_s.split('.').map(&:to_i)
+      "%s and %s cents" % [NumbersInWords.in_words(dollars), NumbersInWords.in_words(cents.presence)]
+    end
+
     def decimals
       int, decimals = NumberGroup.new(@that).split_decimals
       return unless int
 
-      out = NumbersInWords.in_words(int) + ' point '
+      out = NumbersInWords.in_words(int) + @connector
       decimals.each do |decimal|
         out << NumbersInWords.in_words(decimal.to_i) + ' '
       end
@@ -67,7 +77,9 @@ module NumbersInWords
 
       digit = number - tens # write the digits
 
-      unless digit.zero?
+      if digit.zero?
+        'zero'
+      else
         join = number < 100 ? '-' : ' '
         output << join + NumbersInWords.in_words(digit)
       end
